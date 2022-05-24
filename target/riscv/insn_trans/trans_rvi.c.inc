@@ -18,11 +18,6 @@
  * this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#define REQUIRE_ZIHINTPAUSE(ctx) do { \
-    if (!ctx->cfg_ptr->ext_zihintpause) {      \
-        return false;         \
-    }                         \
-} while (0)
 
 static bool trans_illegal(DisasContext *ctx, arg_empty *a)
 {
@@ -804,13 +799,19 @@ static bool trans_srad(DisasContext *ctx, arg_srad *a)
 
 static bool trans_pause(DisasContext *ctx, arg_pause *a)
 {
-    REQUIRE_ZIHINTPAUSE(ctx);
+    if (!ctx->cfg_ptr->ext_zihintpause) {
+        return false;
+    }
 
     /*
      * PAUSE is a no-op in QEMU,
-     * however we need to clear the reservation
+     * however we need to clear the reservation,
+     * end the TB and return to main loop
      */
     tcg_gen_movi_tl(load_res, -1);
+    gen_set_pc_imm(ctx, ctx->pc_succ_insn);
+    tcg_gen_exit_tb(NULL, 0);
+    ctx->base.is_jmp = DISAS_NORETURN;
 
     return true;
 }
